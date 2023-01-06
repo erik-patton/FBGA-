@@ -1,0 +1,28 @@
+---
+title: "FBGA Analysis"
+author: "EPatton"
+date: "2023-01-06"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Project Goals
+
+## Load and clean data for FBGA datasets
+
+### Determine and capture missing data numbers
+### Create daily high temps and low temps for data set
+### Create sWBGT, if needed
+
+## Trend Analysis
+
+### Increase(decrease) in Red & Black Flag Days for record
+### Mann Kendall for entire period daily temps
+
+## Heat Wave Analysis
+Heat waves = Red or Black Flag day (?)
+### Number of 3+ days heat waves over each month and year
+### Number of 5+ days heat waves over each month and year
