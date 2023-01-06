@@ -1,0 +1,152 @@
+---
+title: "FBGA Analysis"
+author: "EPatton"
+date: "2023-01-06"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(lubridate)
+library(sf)
+library(mapview)
+library(RColorBrewer)
+library(readr)
+library(ggplot2)
+```
+
+# Project Goals
+
+## Load and clean data for FBGA datasets
+
+### Determine and capture missing data numbers (done)
+### Create daily high temps and low temps for data set (done)
+### Create sWBGT, if needed
+
+## Trend Analysis
+
+### Increase(decrease) in Red & Black Flag Days for record
+### Mann Kendall for entire period daily temps
+
+## Heat Wave Analysis
+Heat waves = Red or Black Flag day (?)
+### Number of 3+ days heat waves over each month and year
+### Number of 5+ days heat waves over each month and year
+
+#### Load Data Sets
+```{r load data}
+##load the data set, assign it a name, and save the new name
+#KCSG_Raw <- KCSG_Observations
+#write.csv(KCSG_Raw, "/Users/erikpatton/Library/Mobile Documents/com~apple~CloudDocs/Duke/Data_Dissertation/Raw Data/KCSG_Raw.csv")
+
+KCSG <- read_csv("/Users/erikpatton/Library/Mobile Documents/com~apple~CloudDocs/Duke/Data_Dissertation/Raw Data/KCSG_Raw.csv")
+#view(KCSG)
+#str(KCSG)
+#summary(KCSG)
+
+##CREATE DATE/TIME COLUMN
+KCSG <- KCSG %>%
+  mutate('datetime' = make_datetime(year=Year, month = Month, day = Day, hour = Hour..UTC.))%>%
+  mutate('date' = make_date(year=Year, month = Month, day = Day))
+head(KCSG$datetime)
+
+##CREATE CELCIUS COLUMNS, RENAME COLUMNS TO STANDARIZE
+KCSG <- KCSG%>%
+  mutate('Temp.C' = ((Temperature..F.-32)*(5/9)))%>%
+  mutate('Dewpoint.Temp.C' = (Dewpoint.Temperature..F.-32)*(5/9))%>%
+  mutate('Heat.Index.C'=((Heat.Index..F.-32)*(5/9)))%>%
+  mutate('WBGT.C'=((Derived.Wet.Bulb.Globe.Temperature..F.-32)*(5/9)))%>%
+  rename('Temp.F' = Temperature..F.)%>%
+  rename('Dewpoint.Temp.F'=Dewpoint.Temperature..F.)%>%
+  rename('Heat.Index.F'=Heat.Index..F.)%>%
+  rename("WBGT.F"=Derived.Wet.Bulb.Globe.Temperature..F.)
+```
+
+```{r CREATE SINGLE DAY MAX or MIN TEMPS}
+KCSG_DAILY_HIGH.C <- KCSG%>%
+  group_by(date)%>%
+  dplyr::summarise(daily_high = max(Temp.C))%>%
+  as.data.frame()
+
+KCSG_DAILY_LOW.C <- KCSG%>%
+  group_by(date)%>%
+  dplyr::summarise(daily_high = min(Temp.C))%>%
+  as.data.frame()
+```
+
+#### Create an initial plot to visualize missing data 
+```{r}
+KCSG_DAILY_HIGH_PLOT.C <- ggplot(KCSG_DAILY_HIGH.C, aes(x = date, y=daily_high))+
+  geom_line()+
+  geom_smooth(method=lm, col='red')
+print(KCSG_DAILY_HIGH_PLOT.C)
+```
+#### LOAD HEAT CATAGORY TEMPERATURE THRESHOLDS
+```{r TEMPERATURE THRESHOLDS}
+##Create the heat catagory data frame for reference
+Flag_Color <- c("Green","Yellow","Red","Black")
+Category_Temp_Min.F <- c(82,85,88,90)
+Category_Temp_Max.F <- c(84.999,87.999,89.999,104)
+Heat_Categories <- cbind(Flag_Color,Category_Temp_Min.F,Category_Temp_Max.F)
+Heat_Categories <- as.data.frame(Heat_Categories)
+##recast the vector as an integer to get the mutate code to work
+Heat_Categories$Category_Temp_Min.F <- as.integer(Heat_Categories$Category_Temp_Min.F)
+Heat_Categories$Category_Temp_Max.F <- as.integer(Heat_Categories$Category_Temp_Max.F)
+##Create degree Celsius columns
+Heat_Categories <- Heat_Categories%>%
+  mutate(Category_Temp_Min.C = (Category_Temp_Min.F - 32)*(5/9))%>%
+  mutate(Category_Temp_Max.C = (Category_Temp_Max.F-32)*(5/9))
+
+#view(Heat_Categories)
+```
+
+#### Start Red and Black Flag Day Analysis
+```{r}
+##Filter for all days in 'RED' or 'BLACK' heat category
+FBGA.KCSG_WBGT_Filtered <- KCSG%>%
+  filter(KCSG$WBGT.F >= Heat_Categories$Category_Temp_Min.F[3])%>%
+  drop_na(WBGT.F)
+#view(FBGA_WBGT_Filtered)
+summary(FBGA.KCSG_WBGT_Filtered$WBGT.F)
+
+##visualize the days above RED and BLACK heat cat
+KCSG_REDorBLACK_plot <- ggplot(FBGA.KCSG_WBGT_Filtered, aes(x = date, y=WBGT.F))+
+  geom_line()+
+  geom_point()
+print(KCSG_REDorBLACK_plot)
+
+```
+#### Group by year, count and  plot days above RED and above BLACK
+```{r}
+##group the data by year to do a trend analysis over the years - from 1973 to 2022
+##returns number of hours per year at or above RED
+##Filter for hours at RED or above
+FBGA.KCSG_WBGT_REDorABOVE_Hourly_byYear <- KCSG%>%
+  filter(date>='1970-01-01')%>%
+  subset(WBGT.F>=Heat_Categories$Category_Temp_Min.F[3])%>%
+  group_by(Year)%>%
+  count(Year)%>%
+  rename(Hours_Above_Red = n)
+view(FBGA.KCSG_WBGT_REDorABOVE_Hourly_byYear)
+##Plots hours Red or Above
+KCSG_Hours_REDorABOVE_peryear_plot <- ggplot(FBGA.KCSG_WBGT_REDorABOVE_Hourly_byYear, aes(x = Year, y=Hours_Above_Red))+
+  geom_line()+
+  geom_point()
+print(KCSG_Hours_REDorABOVE_peryear_plot)
+
+##Filter for hours BLACK
+FBGA.KCSG_Hours_BLACK_byYear <- KCSG%>%
+  filter(date>='1970-01-01')%>%
+  subset(WBGT.F>=Heat_Categories$Category_Temp_Min.F[4])%>%
+  group_by(Year)%>%
+  count(Year)%>%
+  rename(Hours_Above_Black = n)
+#view(FBGA.KCSG_Hours_BLACK_byYear)
+##Plot hours in Black conditions
+KCSG_Hours_Black_peryear_plot <- ggplot(FBGA.KCSG_Hours_BLACK_byYear, aes(x = Year, y=Hours_Above_Black))+
+  geom_line()+
+  geom_point()
+print(KCSG_Hours_Black_peryear_plot)
+```
+
