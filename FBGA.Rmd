@@ -20,8 +20,8 @@ library(ggplot2)
 
 ## Load and clean data for FBGA datasets
 
-### Determine and capture missing data numbers
-### Create daily high temps and low temps for data set
+### Determine and capture missing data numbers (done)
+### Create daily high temps and low temps for data set (done)
 ### Create sWBGT, if needed
 
 ## Trend Analysis
@@ -99,5 +99,54 @@ Heat_Categories <- Heat_Categories%>%
   mutate(Category_Temp_Max.C = (Category_Temp_Max.F-32)*(5/9))
 
 #view(Heat_Categories)
+```
+
+#### Start Red and Black Flag Day Analysis
+```{r}
+##Filter for all days in 'RED' or 'BLACK' heat category
+FBGA_WBGT_Filtered <- KLSF%>%
+  filter(KLSF$WBGT.F >= Heat_Categories$Category_Temp_Min.F[3])%>%
+  drop_na(WBGT.F)
+#view(FBGA_WBGT_Filtered)
+summary(FBGA_WBGT_Filtered$WBGT.F)
+
+##visualize the days above RED and BLACK heat cat
+KLSF_REDorBLACK_plot <- ggplot(FBGA_WBGT_Filtered, aes(x = date, y=WBGT.F))+
+  geom_line()+
+  geom_point()
+print(KLSF_REDorBLACK_plot)
+
+```
+#### Group by year, count and  plot days above RED and above BLACK
+```{r}
+##group the data by year to do a trend analysis over the years - from 1973 to 2022
+##returns number of hours per year at or above RED
+##Filter for hours at RED or above
+FBGA_WBGT_REDorABOVE_Hourly_byYear <- KLSF%>%
+  filter(date>='1970-01-01')%>%
+  subset(WBGT.F>=Heat_Categories$Category_Temp_Min.F[3])%>%
+  group_by(Year)%>%
+  count(Year)%>%
+  rename(Hours_Above_Red = n)
+#view(FBGA_WBGT_REDorABOVE_Hourly_byYear)
+##Plots hours Red or Above
+KLSF_Hours_REDorABOVE_peryear_plot <- ggplot(FBGA_WBGT_REDorABOVE_Hourly_byYear, aes(x = Year, y=Hours_Above_Red))+
+  geom_line()+
+  geom_point()
+print(KLSF_Hours_REDorABOVE_peryear_plot)
+
+##Filter for hours BLACK
+FBGA_Hours_BLACK_byYear <- KLSF%>%
+  filter(date>='1970-01-01')%>%
+  subset(WBGT.F>=Heat_Categories$Category_Temp_Min.F[4])%>%
+  group_by(Year)%>%
+  count(Year)%>%
+  rename(Hours_Above_Black = n)
+#view(FBGA_Hours_BLACK_byYear)
+##Plot hours in Black conditions
+KLSF_Hours_Black_peryear_plot <- ggplot(FBGA_Hours_BLACK_byYear, aes(x = Year, y=Hours_Above_Black))+
+  geom_line()+
+  geom_point()
+print(KLSF_Hours_Black_peryear_plot)
 ```
 
