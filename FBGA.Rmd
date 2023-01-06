@@ -7,6 +7,13 @@ output: pdf_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(lubridate)
+library(sf)
+library(mapview)
+library(RColorBrewer)
+library(readr)
+library(ggplot2)
 ```
 
 # Project Goals
@@ -26,3 +33,71 @@ knitr::opts_chunk$set(echo = TRUE)
 Heat waves = Red or Black Flag day (?)
 ### Number of 3+ days heat waves over each month and year
 ### Number of 5+ days heat waves over each month and year
+
+#### Load Data Sets
+```{r load data}
+##load the data set, assign it a name, and save the new name
+#KLSF_Raw <- KLSF_Observations
+#write.csv(KLSF_Raw, "/Users/erikpatton/Library/Mobile Documents/com~apple~CloudDocs/Duke/Data_Dissertation/Raw Data/KLSF_Raw.csv")
+
+KLSF <- read_csv("/Users/erikpatton/Library/Mobile Documents/com~apple~CloudDocs/Duke/Data_Dissertation/Raw Data/KLSF_Raw.csv")
+#view(KLSF)
+#str(KLSF)
+#summary(KLSF)
+
+##CREATE DATE/TIME COLUMN
+KLSF <- KLSF %>%
+  mutate('datetime' = make_datetime(year=Year, month = Month, day = Day, hour = Hour..UTC.))%>%
+  mutate('date' = make_date(year=Year, month = Month, day = Day))
+head(KLSF$datetime)
+
+##CREATE CELCIUS COLUMNS, RENAME COLUMNS TO STANDARIZE
+KLSF <- KLSF%>%
+  mutate('Temp.C' = ((Temperature..F.-32)*(5/9)))%>%
+  mutate('Dewpoint.Temp.C' = (Dewpoint.Temperature..F.-32)*(5/9))%>%
+  mutate('Heat.Index.C'=((Heat.Index..F.-32)*(5/9)))%>%
+  mutate('WBGT.C'=((Derived.Wet.Bulb.Globe.Temperature..F.-32)*(5/9)))%>%
+  rename('Temp.F' = Temperature..F.)%>%
+  rename('Dewpoint.Temp.F'=Dewpoint.Temperature..F.)%>%
+  rename('Heat.Index.F'=Heat.Index..F.)%>%
+  rename("WBGT.F"=Derived.Wet.Bulb.Globe.Temperature..F.)
+```
+
+```{r CREATE SINGLE DAY MAX or MIN TEMPS}
+KLSF_DAILY_HIGH.C <- KLSF%>%
+  group_by(date)%>%
+  dplyr::summarise(daily_high = max(Temp.C))%>%
+  as.data.frame()
+
+KLSF_DAILY_LOW.C <- KLSF%>%
+  group_by(date)%>%
+  dplyr::summarise(daily_high = min(Temp.C))%>%
+  as.data.frame()
+```
+
+#### Create an initial plot to visualize missing data 
+```{r}
+KLSF_DAILY_HIGH_PLOT.C <- ggplot(KLSF_DAILY_HIGH.C, aes(x = date, y=daily_high))+
+  geom_line()+
+  geom_smooth(method=lm, col='red')
+print(KLSF_DAILY_HIGH_PLOT.C)
+```
+#### LOAD HEAT CATAGORY TEMPERATURE THRESHOLDS
+```{r TEMPERATURE THRESHOLDS}
+##Create the heat catagory data frame for reference
+Flag_Color <- c("Green","Yellow","Red","Black")
+Category_Temp_Min.F <- c(82,85,88,90)
+Category_Temp_Max.F <- c(84.999,87.999,89.999,104)
+Heat_Categories <- cbind(Flag_Color,Category_Temp_Min.F,Category_Temp_Max.F)
+Heat_Categories <- as.data.frame(Heat_Categories)
+##recast the vector as an integer to get the mutate code to work
+Heat_Categories$Category_Temp_Min.F <- as.integer(Heat_Categories$Category_Temp_Min.F)
+Heat_Categories$Category_Temp_Max.F <- as.integer(Heat_Categories$Category_Temp_Max.F)
+##Create degree Celsius columns
+Heat_Categories <- Heat_Categories%>%
+  mutate(Category_Temp_Min.C = (Category_Temp_Min.F - 32)*(5/9))%>%
+  mutate(Category_Temp_Max.C = (Category_Temp_Max.F-32)*(5/9))
+
+#view(Heat_Categories)
+```
+
