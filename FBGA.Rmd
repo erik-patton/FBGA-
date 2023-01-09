@@ -14,6 +14,13 @@ library(mapview)
 library(RColorBrewer)
 library(readr)
 library(ggplot2)
+#install.packages('Hmisc')
+#install.packages('fBasics')
+library(fBasics)
+library(Hmisc)
+library(trend)
+#install.packages('EnvStats')
+library(EnvStats)
 ```
 
 # Project Goals
@@ -64,15 +71,22 @@ KLSF <- KLSF%>%
 ```
 
 ```{r CREATE SINGLE DAY MAX or MIN TEMPS}
+#Create single day high temp
 KLSF_DAILY_HIGH.C <- KLSF%>%
   group_by(date)%>%
   dplyr::summarise(daily_high = max(Temp.C))%>%
   as.data.frame()
-
+#Create single day low temp
 KLSF_DAILY_LOW.C <- KLSF%>%
   group_by(date)%>%
   dplyr::summarise(daily_high = min(Temp.C))%>%
   as.data.frame()
+#Create single day high WBGT temp
+KLSF_DAILY_HIGH_WBGT.C <- KLSF%>%
+  group_by(date)%>%
+  dplyr::summarise(daily_high_WBGT = max(WBGT.C))%>%
+  as.data.frame()
+#Create single day low WBGT temp
 ```
 
 #### Create an initial plot to visualize missing data 
@@ -123,7 +137,7 @@ print(KLSF_REDorBLACK_plot)
 ##returns number of hours per year at or above RED
 ##Filter for hours at RED or above
 FBGA_WBGT_REDorABOVE_Hourly_byYear <- KLSF%>%
-  filter(date>='1970-01-01')%>%
+  filter(date>='1973-01-01')%>%
   subset(WBGT.F>=Heat_Categories$Category_Temp_Min.F[3])%>%
   group_by(Year)%>%
   count(Year)%>%
@@ -137,7 +151,7 @@ print(KLSF_Hours_REDorABOVE_peryear_plot)
 
 ##Filter for hours BLACK
 FBGA_Hours_BLACK_byYear <- KLSF%>%
-  filter(date>='1970-01-01')%>%
+  filter(date>='1973-01-01')%>%
   subset(WBGT.F>=Heat_Categories$Category_Temp_Min.F[4])%>%
   group_by(Year)%>%
   count(Year)%>%
@@ -149,4 +163,151 @@ KLSF_Hours_Black_peryear_plot <- ggplot(FBGA_Hours_BLACK_byYear, aes(x = Year, y
   geom_point()
 print(KLSF_Hours_Black_peryear_plot)
 ```
+#### TEMPORARY WORKSPACE - COMBINED THE TWO FBGA PLOTS
+```{r COMBINE THE TWO PLOTS}
+FBGA_Combined <- full_join(FBGA_WBGT_REDorABOVE_Hourly_byYear,FBGA.KCSG_WBGT_REDorABOVE_Hourly_byYear, by='Year')
+
+FBGA_Combined <- FBGA_Combined%>%
+  rename(KLSF_RedorAbove_Hourly=Hours_Above_Red.x)%>%
+  rename(KCSG_RedorAbove_Hourly=Hours_Above_Red.y)
+view(FBGA_Combined)
+
+##Create a merged BLACK FLAG data frame
+FBGA_Combined_Black_hourly <- full_join(FBGA_Hours_BLACK_byYear,FBGA.KCSG_Hours_BLACK_byYear,by='Year')%>%
+  rename(KLSF_Black_Hours = Hours_Above_Black.x)%>%
+  rename(KCSG_Black_Hours = Hours_Above_Black.y)
+  #view(FBGA_Combined_Black_hourly)  
+
+
+FBGA_Combined_plot <- ggplot(FBGA_Combined,aes(x=Year))+
+  geom_line(aes(y=KLSF_RedorAbove_Hourly, col='blue'))+
+  geom_smooth(aes(y=KLSF_RedorAbove_Hourly),color='blue')+
+  geom_line(aes(y=KCSG_RedorAbove_Hourly, col='red'))+
+  geom_smooth(aes(y=KCSG_RedorAbove_Hourly),color='red')+
+  scale_color_manual(name='Location', breaks=c('Lawson AAF','Columbus Airport'), values=c('Lawson AAF'='blue','Columbus Airport'='red'))
+print(FBGA_Combined_plot)
+
+FBGA_Combined_Black_plot <- ggplot(FBGA_Combined_Black_hourly,aes(x=Year))+
+  geom_line(aes(y=KLSF_Black_Hours, col='blue'))+
+  geom_smooth(aes(y=KLSF_Black_Hours),color='blue')+
+  geom_line(aes(y=KCSG_Black_Hours, col='red'))+
+  geom_smooth(aes(y=KCSG_Black_Hours),color='red')+
+  scale_color_manual(name='Location', breaks=c('Lawson AAF','Columbus Airport'), values=c('Lawson AAF'='blue','Columbus Airport'='red'))
+print(FBGA_Combined_Black_plot)
+```
+#### STATISTICS AND CORRELATION BETWEEN THE TWO SITES - VALIDATE THEY BOTH ARE SIMILAR
+```{r}
+##CONDUCT A CORRELATION TEST BETWEEN THE TWO SITES TO SEE IF THEY MOVE IN THE SAME DIRECTION (AT LEAST STATISTICALLY)
+##IF THEY DO, WE CAN SAY THAT THE TWO SITES ARE SHOWING THE SAME GENERAL CLIMATE TRENDS ACROSS YEARS
+##NULL HYPOTHESIS IS THEY DO NOT MOVE IN THE SAME DIRECTION, AND THEREFORE WE HAVE LOWER CONFIDENCE IN USING THEM
+
+##Essentially checking that similar sites near each other are legitimate and not contradictory
+
+##Describe the data frame
+lapply(FBGA_Combined,Hmisc::describe)
+
+RedorAbove.regression <- lm(FBGA_Combined$KLSF_RedorAbove_Hourly~FBGA_Combined$KCSG_RedorAbove_Hourly)
+summary(RedorAbove.regression)
+cor.test(FBGA_Combined$KLSF_RedorAbove_Hourly,FBGA_Combined$KCSG_RedorAbove_Hourly)
+
+##The graphs below can help check the fit of the linear model PEARSON'S
+par(mfrow = c(2,2), mar=c(4,4,4,4))
+plot(RedorAbove.regression)
+par(mfrow = c(1,1))
+
+##CHECK FOR NORMAL DISTRIBUTION TO THE POINTS
+##Shapiro test, if P>0.05, then it IS normally distributed. In this case, hourly summary of KCSG is not normally distributed.
+shapiro.test(FBGA_Combined$KLSF_RedorAbove_Hourly)
+shapiro.test(FBGA_Combined$KCSG_RedorAbove_Hourly)
+##Not normally distributed, so should not sure Pearson's correlation tests
+
+FBGA_Combined%>%select(.,KLSF_RedorAbove_Hourly,KCSG_RedorAbove_Hourly)%>%map(~fBasics::dagoTest(.))
+##Omnibus test <0.05 would indicate that the set is NOT normally distributed.
+
+##USE KENDALL RANK CORRELATION TEST - can be used if not from normal distribution
+cor.test(FBGA_Combined$KLSF_RedorAbove_Hourly,FBGA_Combined$KCSG_RedorAbove_Hourly,method="kendall")
+##Shows positive correlation between the 2 sites (tau=0.279) and p-value < 0.05 (0.004) ; implies correlation
+
+##USE SPEARMAN RANK CORRELATION COEFFICIENT - can be used if data is not norma;
+cor.test(FBGA_Combined$KLSF_RedorAbove_Hourly,FBGA_Combined$KCSG_RedorAbove_Hourly,method="spearman")
+##Shows rho = 0.416 and p-value <0.05 ; implies correlation
+
+##All tests return positive correlation and low p-values, including tests robust to non-normal 
+```
+####TIME SERIES ANALYSIS ON THE DATASET
+```{r}
+##LOOK FOR NAS OR MISSING DATA, INTERPOLATE WITH BEFORE AND AFTER VALUES
+
+##High Temp
+#summary(KLSF_DAILY_HIGH.C)
+KLSF_Daily_High.C_Clean <- KLSF_DAILY_HIGH.C%>%
+  mutate(High.C_Clean = zoo::na.approx(KLSF_DAILY_HIGH.C$daily_high))%>%
+  select(date,High.C_Clean)%>%
+  filter(date>='1973-01-01')
+#summary(KLSF_Daily_High.C_Clean)
+##No more NAs
+
+KLSF_Daily_High.TS <- ts(KLSF_Daily_High.C_Clean$High.C_Clean, start = c(1973,01,01),frequency=365)
+KLSF_Daily_High.decomp <- stl(KLSF_Daily_High.TS,s.window="periodic")
+plot(KLSF_Daily_High.decomp)
+KLSF_Daily_High_Trend <- Kendall::SeasonalMannKendall(KLSF_Daily_High.TS)
+summary(KLSF_Daily_High_Trend)
+##This returns a very small p=value, also a small tau, so we can state the trend is STRONGLY statistically significant even though the magnitude of the temperature increase is small (the tau value).
+
+##WBGT
+#summary(KLSF_DAILY_HIGH_WBGT.C)
+KLSF_Daily_High_WBGT.C_Clean <- KLSF_DAILY_HIGH_WBGT.C%>%
+  filter(date>='1973-01-01')%>%
+  mutate(WBGT.C_Clean = zoo::na.approx(KLSF_DAILY_HIGH_WBGT.C$daily_high_WBGT))%>%
+  select(date,WBGT.C_Clean)
+#summary(KLSF_Daily_High_WBGT.C_Clean)
+##No more NAs
+
+##Temp Trend using Mann-Kendall Seasonal Analysis
+KLSF_Daily_High_WBGT.TS <- ts(KLSF_Daily_High_WBGT.C_Clean$WBGT.C_Clean, start = c(1973,01,01),frequency=365)
+KLSF_Daily_High_WBGT.decomp <- stl(KLSF_Daily_High_WBGT.TS,s.window="periodic")
+plot(KLSF_Daily_High_WBGT.decomp)
+KLSF_Daily_High_WBGT_Trend <- Kendall::SeasonalMannKendall(KLSF_Daily_High_WBGT.TS)
+summary(KLSF_Daily_High_WBGT_Trend)
+##This returns a very small p=value, also a small tau, so we can state the trend is STRONGLY statistically significant even though the magnitude of the temperature increase is small (the tau value).
+```
+#### RUN THE PETTITT TEST TO SEE IF THERE IS A SPECIFIC YEAR THAT THE TREND 'TOOK OFF'
+```{r}
+##Run the test of high temp TS
+pettitt.test(KLSF_Daily_High.TS)
+
+#find the date associated with the output 'time K 13497
+KLSF_Daily_High.C_Clean[13497,]
+#Trend change point in March 31st, 2010
+
+
+##Run the test on WBGT TS
+pettitt.test(KLSF_Daily_High_WBGT.TS)
+#p-value is small, so there is a statistically significant point
+
+#find the date associated with the output 'time K 11708
+KLSF_Daily_High_WBGT.C_Clean[11708,]
+#Trend change point in May 7th, 2005
+```
+
+#### WHAT IS INCREASING AT A FASTER RATE - TEMPERATURE OR WBGT?
+```{r}
+##MANUALLY RUN THE MANN KENDALL TEST - HIGH TEMPERATURE
+#Set up month and year columns
+KLSF_Daily_High.C_Clean$month <- month(ymd(KLSF_Daily_High.C_Clean$date))
+KLSF_Daily_High.C_Clean$year <- year(ymd(KLSF_Daily_High.C_Clean$date))
+
+KLSF_Daily_High.C_MannKendall <- kendallSeasonalTrendTest(High.C_Clean ~ month+year, data=KLSF_Daily_High.C_Clean)
+KLSF_Daily_High.C_MannKendall$estimate
+
+##MANUALLY RUN THE MANN KENDALL TEST - WBGT TEMPERATURE
+#Set up month and year columns
+KLSF_Daily_High_WBGT.C_Clean$month <- month(ymd(KLSF_Daily_High_WBGT.C_Clean$date))
+KLSF_Daily_High_WBGT.C_Clean$year <- year(ymd(KLSF_Daily_High_WBGT.C_Clean$date))
+
+KLSF_Daily_High_WBGT.C_MannKendall <- kendallSeasonalTrendTest(WBGT.C_Clean ~ month+year, data=KLSF_Daily_High_WBGT.C_Clean)
+#return just tau, slope, and intercept
+KLSF_Daily_High_WBGT.C_MannKendall$estimate
+```
+According to the slope, the High Temperature is increasing at a rate of 0.008230453 over the 1973-2022 data period. That is an increase of 0.428 degrees C (or about 0.77 degrees F).
 
