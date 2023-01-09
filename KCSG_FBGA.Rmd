@@ -123,7 +123,7 @@ print(KCSG_REDorBLACK_plot)
 ##returns number of hours per year at or above RED
 ##Filter for hours at RED or above
 FBGA.KCSG_WBGT_REDorABOVE_Hourly_byYear <- KCSG%>%
-  filter(date>='1970-01-01')%>%
+  filter(date>='1973-01-01')%>%
   subset(WBGT.F>=Heat_Categories$Category_Temp_Min.F[3])%>%
   group_by(Year)%>%
   count(Year)%>%
@@ -137,7 +137,7 @@ print(KCSG_Hours_REDorABOVE_peryear_plot)
 
 ##Filter for hours BLACK
 FBGA.KCSG_Hours_BLACK_byYear <- KCSG%>%
-  filter(date>='1970-01-01')%>%
+  filter(date>='1973-01-01')%>%
   subset(WBGT.F>=Heat_Categories$Category_Temp_Min.F[4])%>%
   group_by(Year)%>%
   count(Year)%>%
