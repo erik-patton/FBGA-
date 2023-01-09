@@ -11,7 +11,7 @@ library(tidyverse)
 library(lubridate)
 library(sf)
 library(mapview)
-library(RColorBrewer)
+#library(RColorBrewer)
 library(readr)
 library(ggplot2)
 #install.packages('Hmisc')
@@ -69,7 +69,6 @@ KLSF <- KLSF%>%
   rename('Heat.Index.F'=Heat.Index..F.)%>%
   rename("WBGT.F"=Derived.Wet.Bulb.Globe.Temperature..F.)
 ```
-
 ```{r CREATE SINGLE DAY MAX or MIN TEMPS}
 #Create single day high temp
 KLSF_DAILY_HIGH.C <- KLSF%>%
@@ -79,7 +78,7 @@ KLSF_DAILY_HIGH.C <- KLSF%>%
 #Create single day low temp
 KLSF_DAILY_LOW.C <- KLSF%>%
   group_by(date)%>%
-  dplyr::summarise(daily_high = min(Temp.C))%>%
+  dplyr::summarise(daily_LOW = min(Temp.C))%>%
   as.data.frame()
 #Create single day high WBGT temp
 KLSF_DAILY_HIGH_WBGT.C <- KLSF%>%
@@ -124,7 +123,17 @@ KCSG_DAILY_HIGH.C <- KCSG%>%
 
 KCSG_DAILY_LOW.C <- KCSG%>%
   group_by(date)%>%
-  dplyr::summarise(daily_high = min(Temp.C))%>%
+  dplyr::summarise(daily_LOW = min(Temp.C))%>%
+  as.data.frame()
+
+KCSG_DAILY_HIGH_WBGT.C <- KCSG%>%
+  group_by(date)%>%
+  dplyr::summarise(daily_high_WBGT = max(WBGT.C))%>%
+  as.data.frame()
+
+KCSG_DAILY_LOW_WBGT.C <- KCSG%>%
+  group_by(date)%>%
+  dplyr::summarise(daily_LOW_WBGT = min(WBGT.C))%>%
   as.data.frame()
 ```
 
@@ -142,6 +151,7 @@ KCSG_DAILY_HIGH_PLOT.C <- ggplot(KCSG_DAILY_HIGH.C, aes(x = date, y=daily_high))
   geom_smooth(method=lm, col='red')
 print(KCSG_DAILY_HIGH_PLOT.C)
 ```
+
 #### LOAD HEAT CATAGORY TEMPERATURE THRESHOLDS
 ```{r TEMPERATURE THRESHOLDS}
 ##Create the heat catagory data frame for reference
@@ -256,7 +266,7 @@ KCSG_Hours_Black_peryear_plot <- ggplot(FBGA.KCSG_Hours_BLACK_byYear, aes(x = Ye
   geom_point()
 print(KCSG_Hours_Black_peryear_plot)
 ```
-#### TEMPORARY WORKSPACE - COMBINED THE TWO FBGA PLOTS
+#### COMBINED THE TWO FBGA PLOTS
 ```{r COMBINE THE TWO PLOTS}
 FBGA_Combined <- full_join(FBGA_WBGT_REDorABOVE_Hourly_byYear,FBGA.KCSG_WBGT_REDorABOVE_Hourly_byYear, by='Year')
 
@@ -288,8 +298,9 @@ FBGA_Combined_Black_plot <- ggplot(FBGA_Combined_Black_hourly,aes(x=Year))+
   scale_color_manual(name='Location', breaks=c('Lawson AAF','Columbus Airport'), values=c('Lawson AAF'='blue','Columbus Airport'='red'))
 print(FBGA_Combined_Black_plot)
 ```
+
 #### STATISTICS AND CORRELATION BETWEEN THE TWO SITES - VALIDATE THEY BOTH ARE SIMILAR
-```{r}
+```{r Highs - correlation between sites}
 ##CONDUCT A CORRELATION TEST BETWEEN THE TWO SITES TO SEE IF THEY MOVE IN THE SAME DIRECTION (AT LEAST STATISTICALLY)
 ##IF THEY DO, WE CAN SAY THAT THE TWO SITES ARE SHOWING THE SAME GENERAL CLIMATE TRENDS ACROSS YEARS
 ##NULL HYPOTHESIS IS THEY DO NOT MOVE IN THE SAME DIRECTION, AND THEREFORE WE HAVE LOWER CONFIDENCE IN USING THEM
@@ -327,8 +338,9 @@ cor.test(FBGA_Combined$KLSF_RedorAbove_Hourly,FBGA_Combined$KCSG_RedorAbove_Hour
 
 ##All tests return positive correlation and low p-values, including tests robust to non-normal 
 ```
+
 ####TIME SERIES ANALYSIS ON THE DATASET
-```{r}
+```{r Highs and Lows time series KLSF}
 ##LOOK FOR NAS OR MISSING DATA, INTERPOLATE WITH BEFORE AND AFTER VALUES
 
 ##High Temp
@@ -363,9 +375,79 @@ plot(KLSF_Daily_High_WBGT.decomp)
 KLSF_Daily_High_WBGT_Trend <- Kendall::SeasonalMannKendall(KLSF_Daily_High_WBGT.TS)
 summary(KLSF_Daily_High_WBGT_Trend)
 ##This returns a very small p=value, also a small tau, so we can state the trend is STRONGLY statistically significant even though the magnitude of the temperature increase is small (the tau value).
+
+##Low Temp
+#summary(KLSF_DAILY_HIGH.C)
+KLSF_Daily_LOW.C_Clean <- KLSF_DAILY_LOW.C%>%
+  mutate(LOW.C_Clean = zoo::na.approx(KLSF_DAILY_LOW.C$daily_LOW))%>%
+  select(date,LOW.C_Clean)%>%
+  filter(date>='1973-01-01')
+#summary(KLSF_Daily_LOW.C_Clean)
+##No more NAs
+
+KLSF_Daily_LOW.TS <- ts(KLSF_Daily_LOW.C_Clean$LOW.C_Clean, start = c(1973,01,01),frequency=365)
+KLSF_Daily_LOW.decomp <- stl(KLSF_Daily_LOW.TS,s.window="periodic")
+plot(KLSF_Daily_LOW.decomp)
+KLSF_Daily_LOW_Trend <- Kendall::SeasonalMannKendall(KLSF_Daily_LOW.TS)
+summary(KLSF_Daily_LOW_Trend)
+##This returns a very small p=value, also a small tau, so we can state the trend is STRONGLY statistically significant even though the magnitude of the temperature increase is small (the tau value).
 ```
+####TIME SERIES ANALYSIS ON THE DATASET - ALT SITE - KCSG
+```{r Highs analysis KCSG}
+##LOOK FOR NAS OR MISSING DATA, INTERPOLATE WITH BEFORE AND AFTER VALUES - KCSG
+
+##High Temp
+#summary(KCSG_DAILY_HIGH.C)
+KCSG_Daily_High.C_Clean <- KCSG_DAILY_HIGH.C%>%
+  mutate(High.C_Clean = zoo::na.approx(KCSG_DAILY_HIGH.C$daily_high))%>%
+  select(date,High.C_Clean)%>%
+  filter(date>='1973-01-01')
+#summary(KCSG_Daily_High.C_Clean)
+##No more NAs
+
+KCSG_Daily_High.TS <- ts(KCSG_Daily_High.C_Clean$High.C_Clean, start = c(1973,01,01),frequency=365)
+KCSG_Daily_High.decomp <- stl(KCSG_Daily_High.TS,s.window="periodic")
+plot(KCSG_Daily_High.decomp)
+KCSG_Daily_High_Trend <- Kendall::SeasonalMannKendall(KCSG_Daily_High.TS)
+summary(KCSG_Daily_High_Trend)
+##This returns a very small p=value, also a small tau, so we can state the trend is STRONGLY statistically significant even though the magnitude of the temperature increase is small (the tau value).
+
+##WBGT - KCSG
+#summary(KCSG_DAILY_HIGH_WBGT.C)
+KCSG_Daily_High_WBGT.C_Clean <- KCSG_DAILY_HIGH_WBGT.C%>%
+  mutate(WBGT.C_Clean = zoo::na.approx(KCSG_DAILY_HIGH_WBGT.C$daily_high_WBGT))%>%
+  select(date,WBGT.C_Clean)%>%
+  filter(date>='1973-01-01')
+#summary(KCSG_Daily_High_WBGT.C_Clean)
+##No more NAs
+
+##Temp Trend using Mann-Kendall Seasonal Analysis - KCSG
+KCSG_Daily_High_WBGT.TS <- ts(KCSG_Daily_High_WBGT.C_Clean$WBGT.C_Clean, start = c(1973,01,01),frequency=365)
+KCSG_Daily_High_WBGT.decomp <- stl(KCSG_Daily_High_WBGT.TS,s.window="periodic")
+plot(KCSG_Daily_High_WBGT.decomp)
+KCSG_Daily_High_WBGT_Trend <- Kendall::SeasonalMannKendall(KCSG_Daily_High_WBGT.TS)
+summary(KCSG_Daily_High_WBGT_Trend)
+##This returns a very small p=value, also a small tau, so we can state the trend is STRONGLY statistically significant even though the magnitude of the temperature increase is small (the tau value).
+
+##Low Temp
+#summary(KCSG_DAILY_HIGH.C)
+KCSG_Daily_LOW.C_Clean <- KCSG_DAILY_LOW.C%>%
+  mutate(LOW.C_Clean = zoo::na.approx(KCSG_DAILY_LOW.C$daily_LOW))%>%
+  select(date,LOW.C_Clean)%>%
+  filter(date>='1973-01-01')
+#summary(KCSG_Daily_LOW.C_Clean)
+##No more NAs
+
+KCSG_Daily_LOW.TS <- ts(KCSG_Daily_LOW.C_Clean$LOW.C_Clean, start = c(1973,01,01),frequency=365)
+KCSG_Daily_LOW.decomp <- stl(KCSG_Daily_LOW.TS,s.window="periodic")
+plot(KCSG_Daily_LOW.decomp)
+KCSG_Daily_LOW_Trend <- Kendall::SeasonalMannKendall(KCSG_Daily_LOW.TS)
+summary(KCSG_Daily_LOW_Trend)
+##This returns a very small p=value, also a small tau, so we can state the trend is STRONGLY statistically significant even though the magnitude of the temperature increase is small (the tau value).
+```
+
 #### RUN THE PETTITT TEST TO SEE IF THERE IS A SPECIFIC YEAR THAT THE TREND 'TOOK OFF'
-```{r}
+```{r Highs Pettitt KLSF and KCSG}
 ##Run the test of high temp TS
 pettitt.test(KLSF_Daily_High.TS)
 
@@ -381,10 +463,26 @@ pettitt.test(KLSF_Daily_High_WBGT.TS)
 #find the date associated with the output 'time K 11708
 KLSF_Daily_High_WBGT.C_Clean[11708,]
 #Trend change point in May 7th, 2005
+
+
+##Run the test of high temp TS on ALT SITE KCSG
+pettitt.test(KCSG_Daily_High.TS)
+
+#find the date associated with the output 'time K 13594'
+KCSG_Daily_High.C_Clean[13594,]
+#Trend change point in March 31st, 2010 SAME AS KSLF DATA SET
+
+##Run the test on WBGT TS
+pettitt.test(KCSG_Daily_High_WBGT.TS)
+#p-value is small, so there is a statistically significant point
+
+#find the date associated with the output 'time K 13623
+KCSG_Daily_High_WBGT.C_Clean[13623,]
+#Trend change point in April 29, 2010
 ```
 
 #### WHAT IS INCREASING AT A FASTER RATE - TEMPERATURE OR WBGT?
-```{r}
+```{r Highs Analysis KLSF}
 ##MANUALLY RUN THE MANN KENDALL TEST - HIGH TEMPERATURE - MAX DAILY HIGH
 #Set up month and year columns
 KLSF_Daily_High.C_Clean$month <- month(ymd(KLSF_Daily_High.C_Clean$date))
@@ -403,4 +501,53 @@ KLSF_Daily_High_WBGT.C_MannKendall <- kendallSeasonalTrendTest(WBGT.C_Clean ~ mo
 KLSF_Daily_High_WBGT.C_MannKendall$estimate
 ```
 According to the slope, the High Temperature is increasing at a rate of 0.008230453 over the 1973-2022 data period. That is an increase of 0.428 degrees C (or about 0.77 degrees F). NOTE: This was run for the Max Daily High temperatures.
+```{r Lows Analysis KLSF}}
+##MANUALLY RUN THE MANN KENDALL TEST - HIGH TEMPERATURE - MAX DAILY HIGH
+#Set up month and year columns
+KLSF_Daily_LOW.C_Clean$month <- month(ymd(KLSF_Daily_LOW.C_Clean$date))
+KLSF_Daily_LOW.C_Clean$year <- year(ymd(KLSF_Daily_LOW.C_Clean$date))
 
+KLSF_Daily_LOW.C_MannKendall <- kendallSeasonalTrendTest(LOW.C_Clean ~ month+year, data=KLSF_Daily_LOW.C_Clean)
+KLSF_Daily_LOW.C_MannKendall$estimate
+```
+##### The above minimum for KLSF does not appear to be working correctly - there is a 0.00 slope for any change in the minimum temperature. While possible, it seems more likely that something is not fit correctly (the mann-kendall from above gives a very strong correlation between temperature and date; unsure why this method does not provide the slope of that correlation.)
+```{r Visualize the low C at KLSF to determine why no trend is occuring}
+#ggplot(KLSF_Daily_LOW.C_Clean,aes(x=date,y=LOW.C_Clean))+
+#  geom_point(size=0.5)+
+#  geom_smooth(method="lm", formula = y~x)+
+#  geom_text(data = KLSF_Daily_LOW.C_Clean, aes(x = date, y = LOW.C_Clean))
+
+#summary(lm(LOW.C_Clean~date,data = KLSF_Daily_LOW.C_Clean))
+#summary(lm(LOW.C_Clean~date,data = KCSG_Daily_LOW.C_Clean))
+```
+
+#### WHAT IS INCREASING AT A FASTER RATE - TEMPERATURE OR WBGT? - ALT SITE KCSG
+```{r Highs analysis KCSG}
+##MANUALLY RUN THE MANN KENDALL TEST - HIGH TEMPERATURE - MAX DAILY HIGH - ALT SITE KCSG
+#Set up month and year columns
+KCSG_Daily_High.C_Clean$month <- month(ymd(KCSG_Daily_High.C_Clean$date))
+KCSG_Daily_High.C_Clean$year <- year(ymd(KCSG_Daily_High.C_Clean$date))
+
+KCSG_Daily_High.C_MannKendall <- kendallSeasonalTrendTest(High.C_Clean ~ month+year, data=KCSG_Daily_High.C_Clean)
+KCSG_Daily_High.C_MannKendall$estimate
+
+##MANUALLY RUN THE MANN KENDALL TEST - WBGT TEMPERATURE - MAX DAILY HIGH - ALT SITE KCSG
+#Set up month and year columns
+KCSG_Daily_High_WBGT.C_Clean$month <- month(ymd(KCSG_Daily_High_WBGT.C_Clean$date))
+KCSG_Daily_High_WBGT.C_Clean$year <- year(ymd(KCSG_Daily_High_WBGT.C_Clean$date))
+
+KCSG_Daily_High_WBGT.C_MannKendall <- kendallSeasonalTrendTest(WBGT.C_Clean ~ month+year, data=KCSG_Daily_High_WBGT.C_Clean)
+#return just tau, slope, and intercept
+KCSG_Daily_High_WBGT.C_MannKendall$estimate
+```
+This returns an increase of just over 1F for the high temperature time period studied (1.03986F) based on the slope of 0.011111. NOTE: Run just for max temperatures.
+```{r LOWS analysis KCSG}
+##MANUALLY RUN THE MANN KENDALL TEST - LOW TEMPERATURE - MIN DAILY LOW - ALT SITE KCSG
+#Set up month and year columns
+KCSG_Daily_LOW.C_Clean$month <- month(ymd(KCSG_Daily_LOW.C_Clean$date))
+KCSG_Daily_LOW.C_Clean$year <- year(ymd(KCSG_Daily_LOW.C_Clean$date))
+
+KCSG_Daily_LOW.C_MannKendall <- kendallSeasonalTrendTest(LOW.C_Clean ~ month+year, data=KCSG_Daily_LOW.C_Clean)
+KCSG_Daily_LOW.C_MannKendall$estimate
+```
+Slope for increased temperature for minimum at KCSG is 0.02614379. This is 1.36C or 2.45F.

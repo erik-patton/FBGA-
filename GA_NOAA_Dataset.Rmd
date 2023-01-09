@@ -1,0 +1,58 @@
+---
+title: "Loading NOAA Data - West Central GA"
+author: "EPatton"
+date: "2023-01-09"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(lubridate)
+
+```
+```{r CREATE AND READ IN NOAA WEST CENTRAL GA DATA SET - DAILY HIGH TEMP}
+#write_csv(NOAA_GA_WestCentral, "/Users/erikpatton/Library/Mobile Documents/com~apple~CloudDocs/Duke/Data_Dissertation/Raw Data/NOAA_GA_WestCentral.csv")
+NOAA_Raw <- read.csv("/Users/erikpatton/Library/Mobile Documents/com~apple~CloudDocs/Duke/Data_Dissertation/Raw Data/NOAA_GA_WestCentral.csv")
+```
+
+```{r}
+NOAA_GA_WestCentral <- NOAA_Raw
+GA_NOAA_Wrangled <- NOAA_GA_WestCentral%>%
+  drop_na()%>%
+  select(NAME, DATE, TMAX)%>%
+  pivot_wider(names_from = NAME, values_from = TMAX)
+GA_NOAA_Wrangled$DATE <- as_date(GA_NOAA_Wrangled$DATE)
+view(GA_NOAA_Wrangled)
+```
+
+```{r}
+GA_NOAA_Wrangled_group <- GA_NOAA_Wrangled%>%
+  group_by(DATE)
+write_csv(GA_NOAA_Wrangled, "/Users/erikpatton/Library/Mobile Documents/com~apple~CloudDocs/Duke/Data_Dissertation/Raw Data/GA_NOAA_Wrangled.csv")
+
+read.csv()
+```
+
+
+```{r TRY AND GET AVERAGE HIGH TEMPARTURES PER DAY}
+as.data.frame(GA_NOAA_Wrangled, row.names = TRUE, stringsAsFactors=TRUE)
+data.frame(GA_NOAA_Wrangled)
+#GA_NOAA_Wrangled_NUM <- as.numeric(unlist(GA_NOAA_Wrangled))
+#view(GA_NOAA_Wrangled_NUM)
+
+Newdf <- unlist(GA_NOAA_Wrangled$`SUNNYSIDE, GA US`)
+
+as.numeric(unlist(GA_NOAA_Wrangled[2:28]))
+view(GA_NOAA_Wrangled)
+
+GA_NOAA_Wrangled <- lapply(GA_NOAA_Wrangled,as.character)
+view(GA_NOAA_Wrangled)
+GA_NOAA_Wrangled <- lapply(GA_NOAA_Wrangled,as.numeric)
+GA_NOAA_Wrangled$DATE <- NOAA_GA_WestCentral$DATE
+
+view(GA_NOAA_Wrangled)
+
+rowMeans(GA_NOAA_Wrangled_group, na.rm=TRUE)
+NOAA_GA_WestCentral$Row_AVG <- rowMeans(GA_NOAA_Wrangled,na.rm=TRUE)
+```
+
