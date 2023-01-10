@@ -152,6 +152,9 @@ KCSG_DAILY_HIGH_PLOT.C <- ggplot(KCSG_DAILY_HIGH.C, aes(x = date, y=daily_high))
 print(KCSG_DAILY_HIGH_PLOT.C)
 ```
 
+
+
+
 #### LOAD HEAT CATAGORY TEMPERATURE THRESHOLDS
 ```{r TEMPERATURE THRESHOLDS}
 ##Create the heat catagory data frame for reference
@@ -178,13 +181,13 @@ FBGA_WBGT_Filtered <- KLSF%>%
   filter(KLSF$WBGT.F >= Heat_Categories$Category_Temp_Min.F[3])%>%
   drop_na(WBGT.F)
 #view(FBGA_WBGT_Filtered)
-summary(FBGA_WBGT_Filtered$WBGT.F)
+#summary(FBGA_WBGT_Filtered$WBGT.F)
 
 ##visualize the days above RED and BLACK heat cat
 KLSF_REDorBLACK_plot <- ggplot(FBGA_WBGT_Filtered, aes(x = date, y=WBGT.F))+
   geom_line()+
   geom_point()
-print(KLSF_REDorBLACK_plot)
+#print(KLSF_REDorBLACK_plot)
 ```
 #### Start Red and Black Flag Day Analysis - ALT SITE - KCSG
 ```{r}
@@ -193,13 +196,13 @@ FBGA.KCSG_WBGT_Filtered <- KCSG%>%
   filter(KCSG$WBGT.F >= Heat_Categories$Category_Temp_Min.F[3])%>%
   drop_na(WBGT.F)
 #view(FBGA_WBGT_Filtered)
-summary(FBGA.KCSG_WBGT_Filtered$WBGT.F)
+#summary(FBGA.KCSG_WBGT_Filtered$WBGT.F)
 
 ##visualize the days above RED and BLACK heat cat KCSG SITE
 KCSG_REDorBLACK_plot <- ggplot(FBGA.KCSG_WBGT_Filtered, aes(x = date, y=WBGT.F))+
   geom_line()+
   geom_point()
-print(KCSG_REDorBLACK_plot)
+#print(KCSG_REDorBLACK_plot)
 
 ```
 #### Group by year, count and  plot days above RED and above BLACK
@@ -232,7 +235,7 @@ FBGA_Hours_BLACK_byYear <- KLSF%>%
 KLSF_Hours_Black_peryear_plot <- ggplot(FBGA_Hours_BLACK_byYear, aes(x = Year, y=Hours_Above_Black))+
   geom_line()+
   geom_point()
-print(KLSF_Hours_Black_peryear_plot)
+#print(KLSF_Hours_Black_peryear_plot)
 ```
 #### Group by year, count and  plot days above RED and above BLACK - ALT SITE - KCSG
 ```{r}
@@ -245,12 +248,12 @@ FBGA.KCSG_WBGT_REDorABOVE_Hourly_byYear <- KCSG%>%
   group_by(Year)%>%
   count(Year)%>%
   rename(Hours_Above_Red = n)
-view(FBGA.KCSG_WBGT_REDorABOVE_Hourly_byYear)
+#view(FBGA.KCSG_WBGT_REDorABOVE_Hourly_byYear)
 ##Plots hours Red or Above
 KCSG_Hours_REDorABOVE_peryear_plot <- ggplot(FBGA.KCSG_WBGT_REDorABOVE_Hourly_byYear, aes(x = Year, y=Hours_Above_Red))+
   geom_line()+
   geom_point()
-print(KCSG_Hours_REDorABOVE_peryear_plot)
+#print(KCSG_Hours_REDorABOVE_peryear_plot)
 
 ##Filter for hours BLACK
 FBGA.KCSG_Hours_BLACK_byYear <- KCSG%>%
@@ -264,7 +267,7 @@ FBGA.KCSG_Hours_BLACK_byYear <- KCSG%>%
 KCSG_Hours_Black_peryear_plot <- ggplot(FBGA.KCSG_Hours_BLACK_byYear, aes(x = Year, y=Hours_Above_Black))+
   geom_line()+
   geom_point()
-print(KCSG_Hours_Black_peryear_plot)
+#print(KCSG_Hours_Black_peryear_plot)
 ```
 #### COMBINED THE TWO FBGA PLOTS
 ```{r COMBINE THE TWO PLOTS}
@@ -273,13 +276,13 @@ FBGA_Combined <- full_join(FBGA_WBGT_REDorABOVE_Hourly_byYear,FBGA.KCSG_WBGT_RED
 FBGA_Combined <- FBGA_Combined%>%
   rename(KLSF_RedorAbove_Hourly=Hours_Above_Red.x)%>%
   rename(KCSG_RedorAbove_Hourly=Hours_Above_Red.y)
-view(FBGA_Combined)
+#view(FBGA_Combined)
 
 ##Create a merged BLACK FLAG data frame
-FBGA_Combined_Black_hourly <- full_join(FBGA_Hours_BLACK_byYear,FBGA.KCSG_Hours_BLACK_byYear,by='Year')%>%
+FBGA_Combined_Black_hourly <- full_join(FBGA_Hours_BLACK_byYear,FBGA.KCSG_Hours_BLACK_byYear, by='Year')%>%
   rename(KLSF_Black_Hours = Hours_Above_Black.x)%>%
   rename(KCSG_Black_Hours = Hours_Above_Black.y)
-  #view(FBGA_Combined_Black_hourly)  
+#  view(FBGA_Combined_Black_hourly)  
 
 
 FBGA_Combined_plot <- ggplot(FBGA_Combined,aes(x=Year))+
@@ -551,3 +554,70 @@ KCSG_Daily_LOW.C_MannKendall <- kendallSeasonalTrendTest(LOW.C_Clean ~ month+yea
 KCSG_Daily_LOW.C_MannKendall$estimate
 ```
 Slope for increased temperature for minimum at KCSG is 0.02614379. This is 1.36C or 2.45F.
+
+
+
+
+#### VALIDATE AND PLOT THAT TWO SAMPLE SITES FOLLOW REGIONAL TREND
+```{r CREATE AND READ IN NOAA WEST CENTRAL GA DATA SET - DAILY HIGH TEMP}
+#write_csv(NOAA_GA_WestCentral, "/Users/erikpatton/Library/Mobile Documents/com~apple~CloudDocs/Duke/Data_Dissertation/Raw Data/NOAA_GA_WestCentral.csv")
+#write_csv(STATION_Missing.Years, "/Users/erikpatton/Library/Mobile Documents/com~apple~CloudDocs/Duke/Data_Dissertation/Raw Data/NOAA_GA_WestCentral_MissingYears.csv")
+NOAA_Raw <- read.csv("/Users/erikpatton/Library/Mobile Documents/com~apple~CloudDocs/Duke/Data_Dissertation/Raw Data/NOAA_GA_WestCentral.csv")
+NOAA_Raw_MissingYears <- read.csv("/Users/erikpatton/Library/Mobile Documents/com~apple~CloudDocs/Duke/Data_Dissertation/Raw Data/NOAA_GA_WestCentral_MissingYears.csv")
+```
+
+```{r WRANGLE NOAA WEST CENTRAL GA DATA}
+##create a name for the full data set and bind the missing data piece(s)
+NOAA_GA_WestCentral <- NOAA_Raw
+NOAA_GA_WestCentral <- rbind(NOAA_GA_WestCentral, NOAA_Raw_MissingYears)
+##select needed columns and remove duplicates
+GA_NOAA_Wrangled <- NOAA_GA_WestCentral %>%
+  select(NAME, DATE, TMAX)%>%
+  distinct()%>%
+  arrange(ymd(DATE))
+
+GA_NOAA_Wrangled$DATE <- as_date(GA_NOAA_Wrangled$DATE)
+
+GA_NOAA_Wrangled_Wide <- pivot_wider(GA_NOAA_Wrangled,names_from = NAME, values_from = TMAX)
+#view(GA_NOAA_Wrangled_Wide)
+```
+
+
+```{r TRY AND GET AVERAGE HIGH TEMPARTURES PER DAY - THE AVERAGE FOR THE GEORGIA WEST CENTRAL REPORTING DISTRICT (i.e. where FBGA is located)}
+##Create a new column with the average temperature of all stations that reported for that date
+GA_NOAA_Wrangled_Wide$Row_AVG <- rowMeans(GA_NOAA_Wrangled_Wide[,2:141],na.rm=TRUE)
+
+GA_NOAA_Wrangled_Wide <- GA_NOAA_Wrangled_Wide%>%
+  select(DATE,Row_AVG)%>%
+  mutate(Row_AVG.C = ((Row_AVG-32)*(5/9)))%>%
+  rename(date=DATE)
+
+#Join all three main data sets to the same NOAA data set (NOAA data set is most complete)
+GA_NOAA_Wrangled_Wide <-  full_join(GA_NOAA_Wrangled_Wide,KLSF_Daily_High.C_Clean,by="date")
+GA_NOAA_Wrangled_Wide <- GA_NOAA_Wrangled_Wide%>%
+  select(date,Row_AVG.C,High.C_Clean)%>%
+  rename(KLSF.C=High.C_Clean)
+GA_NOAA_Wrangled_Wide <- full_join(GA_NOAA_Wrangled_Wide,KCSG_Daily_High.C_Clean,by="date")
+GA_NOAA_Wrangled_Wide <- GA_NOAA_Wrangled_Wide%>%
+  select(date,Row_AVG.C,KLSF.C,High.C_Clean)%>%
+  rename(KCSG.C=High.C_Clean)
+view(GA_NOAA_Wrangled_Wide)
+```
+```{r PLOT THE THREE DAILY HIGH TEMPERATURES}
+GA_Daily_High.C <- GA_NOAA_Wrangled_Wide
+GA_Daily_High.C.plot <- ggplot(GA_Daily_High.C, aes(x=date))+
+  geom_line(aes(y=KLSF.C, color='blue'), size=0.2)+
+  geom_line(aes(y=KCSG.C,color='red'),linewidth=0.2)+
+  geom_line(aes(y=Row_AVG.C,color='white'),linewidth=0.2)
+GA_Daily_High.C.plot
+
+##SUBSECTION FOR LAST TEN YEARS FOR BETTER VISUAL ANALYSIS
+GA_Daily_High.C._Last10Year <- GA_Daily_High.C%>%
+  filter(date>="2012-01-01", date<="2018-01-01")
+  
+GA_Daily_High.C.plot_10Year <- ggplot(GA_Daily_High.C._Last10Year, aes(x=date))+
+  geom_line(aes(y=KLSF.C, color='blue'), size=0.2)+
+  geom_line(aes(y=KCSG.C,color='red'),linewidth=0.2)+
+  geom_line(aes(y=Row_AVG.C,color='white'),linewidth=0.2)
+GA_Daily_High.C.plot_10Year
+```
