@@ -9,8 +9,8 @@ output: pdf_document
 knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(lubridate)
-library(sf)
-library(mapview)
+#library(sf)
+#library(mapview)
 #library(RColorBrewer)
 library(readr)
 library(ggplot2)
@@ -620,4 +620,55 @@ GA_Daily_High.C.plot_10Year <- ggplot(GA_Daily_High.C._Last10Year, aes(x=date))+
   geom_line(aes(y=KCSG.C,color='red'),linewidth=0.2)+
   geom_line(aes(y=Row_AVG.C,color='white'),linewidth=0.2)
 GA_Daily_High.C.plot_10Year
+```
+#### HEAT WAVE ANALYSIS SECTION FROM HEAT WAVE PACKAGE
+```{r SET UP THE HEAT WAVE DATA FRAME AND PACKAGE}
+install.packages('heatwaveR')
+library(heatwaveR)
+library(ggpubr)
+library(ggplot2)
+#Work on heatwaveR package
+
+#package needs a tmin and tmax column
+##NOTE date column must be assigned name as 't'
+KLSF_heatwave <- data.frame(t=KLSF_Daily_High.C_Clean$date, tMax=KLSF_Daily_High.C_Clean$High.C_Clean, tmin= KLSF_Daily_LOW.C_Clean$LOW.C_Clean)
+
+tMax_clim <- ts2clm(data=KLSF_heatwave, y= tMax, climatologyPeriod = c("1973-01-01","2022-09-30"), pctile = 95)
+tMin_exc <- exceedance(data = KLSF_heatwave, y = tmin, threshold = 20, minDuration = 3, maxGap = 1)$threshold
+
+##NOTE you can probably substitute the 95% column for minumum temperatures against the fixed value of '20' used here.
+```
+
+```{r RUN THE HEAT WAVE PACKAGE I.E. DETECT EVENT}
+# Note that because we calculated our 90th percentile threshold on a column named 'tMax' 
+# and not the default column name 'temp', we must specify this below with 'y = tMax'
+events <- detect_event(data = tMax_clim, y = tMax, # The 90th percentile threshold
+                       threshClim2 = tMin_exc$exceedance) # The flat exceedance threshold
+#events
+
+#event_exc <- exceedance(data = tMax_clim, y = tMax, # The 90th percentile threshold
+ #                      threshClim2 = tMin_exc$exceedance)
+
+
+```
+
+```{r CREATE PLOTS FROM THE WEBSITE CODE}
+bubble_plot <- ggplot(data = events$event, aes(x = date_peak, y = intensity_max)) +
+  geom_point(aes(size = intensity_cumulative), shape = 21, fill = "salmon", alpha = 0.8) +
+  labs(x = NULL, y = "Maximum Intensity [°C] ", size = "Cumulative Intensity [°C x days]") +
+  scale_size_continuous(range = c(1, 10), 
+                        guide = guide_legend(title.position = "top", direction = "horizontal")) +
+  theme_bw() +
+  theme(legend.position = c(0.3, 0.12),
+        legend.box.background = element_rect(colour = "black"))
+#print(bubble_plot)
+
+ggarrange(event_line(events, y = tMax, metric = "intensity_max"),
+          event_line(events, y = tMax, metric = "intensity_max", category = T),
+          lolli_plot(events),
+          bubble_plot,
+          ncol = 2, nrow = 2, align = "hv")
+##The below is giving trouble and will need troubleshooting to figure out
+#event_line(events, spread = 10, start_date = "1973-05-01", end_date="2000-12-31", category = TRUE)
+
 ```

@@ -1,0 +1,123 @@
+---
+title: "GA Percentile Analysis"
+author: "EPatton"
+date: "2023-01-12"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(lubridate)
+#library(sf)
+#library(mapview)
+#library(RColorBrewer)
+library(readr)
+library(ggplot2)
+#install.packages('Hmisc')
+#install.packages('fBasics')
+library(fBasics)
+library(Hmisc)
+library(trend)
+#install.packages('EnvStats')
+library(EnvStats)
+```
+
+#### Attempt to determine 95th percentile for days in the three GA data sets
+```{r}
+GA_95P <- GA_Daily_High.C
+GA_95P$Julian <- format(GA_95P$date,"%j")            #create julian date to do statistics
+  
+#Below returns the 95th percentile for each Julian date in the data set for the AVG. Can do for other two observations then do cbind?
+GA_95P_AVG <- GA_95P%>%  
+  group_by(Julian)%>%
+  summarise(percent95=quantile(Row_AVG.C,probs=.95))
+GA_95P_KLSF <- GA_95P %>%  
+  mutate(KLSF.C=zoo::na.approx(GA_95P$KLSF.C))%>%
+  group_by(Julian)%>%
+  summarise(percent95=quantile(KLSF.C,probs=.95))
+GA_95P_KCSG <- GA_95P %>%  
+  mutate(KCSG.C=zoo::na.approx(GA_95P$KCSG.C))%>%
+  group_by(Julian)%>%
+  summarise(percent95=quantile(KCSG.C,probs=.95))
+
+#Bind the resulting 95% percentile high temperatures
+GA_95P_Julian <- GA_95P_AVG %>%
+  rename(AVG_High_95P = percent95)
+
+GA_95P_Julian <-   left_join(GA_95P_Julian,GA_95P_KCSG)
+GA_95P_Julian <- GA_95P_Julian%>%
+  rename(KCSG_High_95P = percent95)
+
+GA_95P_Julian <- left_join(GA_95P_Julian,GA_95P_KLSF)
+GA_95P_Julian <- GA_95P_Julian%>%
+  rename(KLSF_High_95P = percent95)
+```
+#### COMPARE 95 PERCENTILE HIGH TEMPERATURE DAYS WITH ACTUAL DAYS
+```{r}
+#Join together the 95th percentile with the daily high temperature records by julian date
+GA_95P <- left_join(GA_95P,GA_95P_Julian)
+
+#return(True/False) if the daily high temp is above 95th percentile
+GA_95P$AVG_High_Above <-  (GA_95P$Row_AVG.C >= GA_95P$AVG_High_95P) 
+GA_95P$KLSF_High_Above <- (GA_95P$KLSF.C>=GA_95P$KLSF_High_95P)
+GA_95P$KCSG_High_Above <- (GA_95P$KCSG.C>=GA_95P$KCSG_High_95P)
+#summary(GA_95P$AVG_High_Above)
+
+#Filter the data frame for just those days above 
+GA_95P_Wrangled <- GA_95P%>%
+  filter(AVG_High_Above==TRUE&(KCSG_High_Above==TRUE|KLSF_High_Above==TRUE))
+view(GA_95P_Wrangled)
+```
+
+```{r SET UP THE HEAT WAVE DATA FRAME AND PACKAGE}
+install.packages('heatwaveR')
+library(heatwaveR)
+library(ggpubr)
+library(ggplot2)
+#Work on heatwaveR package
+
+#package needs a tmin and tmax column
+##NOTE date column must be assigned name as 't'
+KLSF_heatwave <- data.frame(t=KLSF_Daily_High.C_Clean$date, tMax=KLSF_Daily_High.C_Clean$High.C_Clean, tmin= KLSF_Daily_LOW.C_Clean$LOW.C_Clean)
+
+tMax_clim <- ts2clm(data=KLSF_heatwave, y= tMax, climatologyPeriod = c("1973-01-01","2022-09-30"), pctile = 95)
+tMin_exc <- exceedance(data = KLSF_heatwave, y = tmin, threshold = 20, minDuration = 3, maxGap = 1)$threshold
+
+##NOTE you can probably substitute the 95% column for minumum temperatures against the fixed value of '20' used here.
+```
+
+```{r RUN THE HEAT WAVE PACKAGE I.E. DETECT EVENT}
+# Note that because we calculated our 90th percentile threshold on a column named 'tMax' 
+# and not the default column name 'temp', we must specify this below with 'y = tMax'
+events <- detect_event(data = tMax_clim, y = tMax, # The 90th percentile threshold
+                       threshClim2 = tMin_exc$exceedance) # The flat exceedance threshold
+#events
+
+#event_exc <- exceedance(data = tMax_clim, y = tMax, # The 90th percentile threshold
+ #                      threshClim2 = tMin_exc$exceedance)
+
+
+```
+
+```{r CREATE PLOTS FROM THE WEBSITE CODE}
+bubble_plot <- ggplot(data = events$event, aes(x = date_peak, y = intensity_max)) +
+  geom_point(aes(size = intensity_cumulative), shape = 21, fill = "salmon", alpha = 0.8) +
+  labs(x = NULL, y = "Maximum Intensity [°C] ", size = "Cumulative Intensity [°C x days]") +
+  scale_size_continuous(range = c(1, 10), 
+                        guide = guide_legend(title.position = "top", direction = "horizontal")) +
+  theme_bw() +
+  theme(legend.position = c(0.3, 0.12),
+        legend.box.background = element_rect(colour = "black"))
+#print(bubble_plot)
+
+ggarrange(event_line(events, y = tMax, metric = "intensity_max"),
+          event_line(events, y = tMax, metric = "intensity_max", category = T),
+          lolli_plot(events),
+          bubble_plot,
+          ncol = 2, nrow = 2, align = "hv")
+##The below is giving trouble and will need troubleshooting to figure out
+#event_line(events, spread = 10, start_date = "1973-05-01", end_date="2000-12-31", category = TRUE)
+
+```
+
