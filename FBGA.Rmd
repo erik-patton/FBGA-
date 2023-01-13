@@ -152,9 +152,6 @@ KCSG_DAILY_HIGH_PLOT.C <- ggplot(KCSG_DAILY_HIGH.C, aes(x = date, y=daily_high))
 print(KCSG_DAILY_HIGH_PLOT.C)
 ```
 
-
-
-
 #### LOAD HEAT CATAGORY TEMPERATURE THRESHOLDS
 ```{r TEMPERATURE THRESHOLDS}
 ##Create the heat catagory data frame for reference
@@ -205,7 +202,7 @@ KCSG_REDorBLACK_plot <- ggplot(FBGA.KCSG_WBGT_Filtered, aes(x = date, y=WBGT.F))
 #print(KCSG_REDorBLACK_plot)
 
 ```
-#### Group by year, count and  plot days above RED and above BLACK
+#### Group by year, count and  plot hours above RED and above BLACK
 ```{r}
 ##group the data by year to do a trend analysis over the years - from 1973 to 2022
 ##returns number of hours per year at or above RED
@@ -503,7 +500,7 @@ KLSF_Daily_High_WBGT.C_MannKendall <- kendallSeasonalTrendTest(WBGT.C_Clean ~ mo
 #return just tau, slope, and intercept
 KLSF_Daily_High_WBGT.C_MannKendall$estimate
 ```
-According to the slope, the High Temperature is increasing at a rate of 0.008230453 over the 1973-2022 data period. That is an increase of 0.428 degrees C (or about 0.77 degrees F). NOTE: This was run for the Max Daily High temperatures.
+According to the slope, the High Temperature is increasing at a rate of 0.008230453 over the 1973-2022 data period. That is an increase of 0.428 degrees C (or about 0.77 degrees F). NOTE: This was run for the Max Daily High temperatures. WBGT appears to be increasing much faster with a slope rate of 0.0155 (or about 0.806 C / 1.45 F).
 ```{r Lows Analysis KLSF}}
 ##MANUALLY RUN THE MANN KENDALL TEST - HIGH TEMPERATURE - MAX DAILY HIGH
 #Set up month and year columns
@@ -642,33 +639,31 @@ tMin_exc <- exceedance(data = KLSF_heatwave, y = tmin, threshold = 20, minDurati
 ```{r RUN THE HEAT WAVE PACKAGE I.E. DETECT EVENT}
 # Note that because we calculated our 90th percentile threshold on a column named 'tMax' 
 # and not the default column name 'temp', we must specify this below with 'y = tMax'
-events <- detect_event(data = tMax_clim, y = tMax, # The 90th percentile threshold
+events <- detect_event(data = tMax_clim, y = tMax, # The 95th percentile threshold
                        threshClim2 = tMin_exc$exceedance) # The flat exceedance threshold
 #events
 
-#event_exc <- exceedance(data = tMax_clim, y = tMax, # The 90th percentile threshold
- #                      threshClim2 = tMin_exc$exceedance)
 
 
 ```
 
 ```{r CREATE PLOTS FROM THE WEBSITE CODE}
-bubble_plot <- ggplot(data = events$event, aes(x = date_peak, y = intensity_max)) +
-  geom_point(aes(size = intensity_cumulative), shape = 21, fill = "salmon", alpha = 0.8) +
-  labs(x = NULL, y = "Maximum Intensity [°C] ", size = "Cumulative Intensity [°C x days]") +
+bubble_plot <- ggplot(data = events$event, aes(x = date_peak, y = duration)) +
+  geom_point(aes(size = duration), shape = 21, fill = "salmon", alpha = 0.8) +
+  labs(x = NULL, y = "duration", size = "duration") +
   scale_size_continuous(range = c(1, 10), 
                         guide = guide_legend(title.position = "top", direction = "horizontal")) +
   theme_bw() +
   theme(legend.position = c(0.3, 0.12),
         legend.box.background = element_rect(colour = "black"))
-#print(bubble_plot)
+print(bubble_plot)
 
 ggarrange(event_line(events, y = tMax, metric = "intensity_max"),
           event_line(events, y = tMax, metric = "intensity_max", category = T),
           lolli_plot(events),
           bubble_plot,
-          ncol = 2, nrow = 2, align = "hv")
+          ncol = 1, nrow = 4, align = "hv")
 ##The below is giving trouble and will need troubleshooting to figure out
-#event_line(events, spread = 10, start_date = "1973-05-01", end_date="2000-12-31", category = TRUE)
+event_line(events, spread = 10, start_date = "1973-05-01", end_date="2022-09-30", category = TRUE)
 
 ```
